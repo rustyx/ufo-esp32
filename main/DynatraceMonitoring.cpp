@@ -255,6 +255,9 @@ String DynatraceMonitoring::getPublicIp() {
     if (mClient.Prepare(&mUrl)) {
         unsigned short responseCode = mClient.HttpGet();
         response = mClient.GetResponseData();
+		if (responseCode / 2 != 2) {
+			ESP_LOGW(LOGTAG, "error detecting public IP: %d", responseCode);
+		}
     }
     mClient.Clear();
     ESP_LOGI(LOGTAG, "public IP: %s", response.c_str());
