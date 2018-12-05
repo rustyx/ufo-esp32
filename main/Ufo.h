@@ -8,6 +8,7 @@
 #include "DynatraceIntegration.h"
 #include "DynatraceMonitoring.h"
 #include "AWSIntegration.h"
+#include "MQTTIntegration.h"
 #include "Wifi.h"
 #include "Config.h"
 #include "UfoWebServer.h"
@@ -37,6 +38,7 @@ public:
 	DynatraceIntegration&	GetDtIntegration() 	{ return mDt; };
 	AWSIntegration&			GetAWSIntegration() { return mAws; };
     String&					GetId()             { return mId; };
+	DynamicRequestHandler   CreateRequestHandler() { return {this, &mDisplayCharterLevel1, &mDisplayCharterLevel2}; }
 
 	DynatraceMonitoring dt;
 	
@@ -63,6 +65,7 @@ private:
 
 	DynatraceIntegration mDt;
 	AWSIntegration mAws;
+	MQTTIntegration mMqtt;
 
 	bool mbButtonPressed;
 	bool mbApiCallReceived;

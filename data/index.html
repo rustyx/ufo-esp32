@@ -89,6 +89,9 @@
 					<a href="#!pagewifisettings" class="padded-list">WiFi Settings</a>
 				</li>
 				<li>
+					<a href="#!pagemqttsettings" class="padded-list">MQTT Settings</a>
+				</li>
+				<li>
 					<a href="#!pageserversettings" class="padded-list">Web Server Settings</a>
 				</li>
 			</ul>
@@ -155,11 +158,11 @@
 		</header>
 		<div class="content">
 			<div class="input-wrapper list">
-				<ul class="list">
+				<ul class="list" id="otaoption">
 					<li class="divider">from update server</li>
 					<li class="padded-list">
 						<div id="versiondisplay">Checking for newer version...</div>
-						<div><font color="red" id="versionerror" style="Display:None">Failed to connect to github.com to check for new version!</font></div>
+						<div><font color="red" id="versionerror" style="Display:None">OTA check failed</font></div>
 						<button class="btn btn-flat primary" id="firmware_update" style="Display:None">download and update</button>
 					</li>
 					<li class="padded-list">
@@ -265,6 +268,51 @@
 			</div>
 		</div>
 	</pagewifisettings>
+	<pagemqttsettings data-page="true">
+		<header class="header-bar">
+			<button class="btn icon icon-arrow-back pull-left" data-navigation="$previous-page"></button>
+			<div class="center">
+				<h1 class="title">Dynatrace UFO - MQTT Settings</h1>
+			</div>
+		</header>
+		<div class="content">
+			<div class="input-wrapper list">
+				<form method='POST' action='/mqttconfig' id='configmqttform'>
+					<div class="padded-full">
+						<ul class="list">
+							MQTT client id:<br>
+							<input type="text" name="mqttclientid" id="mqttclientid" readonly="readonly" disabled="disabled" />
+							MQTT command topic (required to enable MQTT):<br>
+							<input type="text" name="mqtttopic" id="mqtttopic" />
+							MQTT status topic (optional):<br>
+							<input type="text" name="mqttstatustopic" id="mqttstatustopic" />
+							MQTT status message frequency (seconds):<br>
+							<input type="number" name="mqttstatusperiodseconds" id="mqttstatusperiodseconds" />
+							MQTT status QoS (0/1):<br>
+							<input type="number" name="mqttstatusqos" id="mqttstatusqos" />
+							MQTT URI (e.g. mqtts://[user[:pass]@]host:port. Supported protocols: mqtt:// mqtts:// ws:// wss://):<br>
+							<input type="url" name="mqtturi" id="mqtturi" />
+							MQTT password (optional):<br>
+							<input type="password" name="mqttpw" id="mqttpw" />
+							Server Certificate (CA cert in PEM format, required for TLS protocols)
+							<textarea name="mqttservercert" id="mqttservercert" style='Height:90px'></textarea>
+							Client Key (optional)
+							<textarea name="mqttclientkey" id="mqttclientkey" style='Height:90px'></textarea>
+							Client Certificate (optional)
+							<textarea name="mqttclientcert" id="mqttclientcert" style='Height:90px'></textarea>
+							MQTT keep-alive (seconds):<br>
+							<input type="number" name="mqttkeepalive" id="mqttkeepalive" />
+						</ul>
+					</div>
+					<div class="padded-full">
+						<span class="padded-list"><font color="red" id="configmqtterror"></font></span>
+						<button class="btn btn-submit fit-parent primary" type='button' id='configureMqtt'>Apply settings and reboot.</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</pagemqttsettings>
+
 	<pageserversettings data-page="true">
 		<header class="header-bar">
 			<button class="btn icon icon-arrow-back pull-left" data-navigation="$previous-page"></button>
@@ -611,6 +659,9 @@ abc1234....
 					success: function (res, xhr) {
 						if(res.status === 'notyetstarted') {
 							continueHome();
+						} else if (res.status === 'off') {
+							document.getElementById('otaoption').style.display = 'none';
+							continueHome();
 						} else {
 							phonon.navigator().changePage('pagefirmwareprogress');
 						}
@@ -817,6 +868,38 @@ abc1234....
 						document.getElementById('macaddress').innerHTML = result.macaddress;
 						document.getElementById('wifihostname').value = result.hostname;
 						document.getElementById('firmwareversion').innerHTML = result.firmwareversion;
+					},
+					error: function (res, flagError, xhr) {
+						console.error(flagError);
+						console.log(res);
+					}
+				});
+			}
+			if (evt.detail.page == "pagemqttsettings") {
+				var configureMqtt = function(){
+					document.getElementById('configmqtterror').innerText = "";
+					document.getElementById('configmqttform').submit();
+				}
+				document.querySelector('#configureMqtt').on('tap', configureMqtt);
+				document.querySelector('#configureMqtt').on('click', configureMqtt);
+
+				var req = phonon.ajax({
+					method: 'GET',
+					url: 'info',
+					dataType: 'text/json',
+					success: function (res, xhr) {
+						var result = JSON.parse(xhr.response);
+						document.getElementById('mqttclientid').value = result.ufoid || "";
+						document.getElementById('mqtttopic').value = result.mqtttopic || "";
+						document.getElementById('mqttstatustopic').value = result.mqttstatustopic || "";
+						document.getElementById('mqttstatusperiodseconds').value = result.mqttstatusperiodseconds || "120";
+						document.getElementById('mqttstatusqos').value = result.mqttstatusqos || "0";
+						document.getElementById('mqttkeepalive').value = result.mqttkeepalive || "30";
+						document.getElementById('mqtturi').value = result.mqtturi || "";
+						document.getElementById('mqttpw').value = result.mqttpw || "";
+						document.getElementById('mqttservercert').value = result.mqttservercert || "";
+						document.getElementById('mqttclientkey').value = result.mqttclientkey || "";
+						document.getElementById('mqttclientcert').value = result.mqttclientcert || "";
 					},
 					error: function (res, flagError, xhr) {
 						console.error(flagError);

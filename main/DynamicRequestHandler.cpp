@@ -8,6 +8,7 @@
 #include "Ota.h"
 #include "String.h"
 #include "WebClient.h"
+#include <cJSON.h>
 
 static char tag[] = "DynamicRequestHandler";
 
@@ -15,8 +16,8 @@ static char tag[] = "DynamicRequestHandler";
 //#define LATEST_FIRMWARE_URL "https://surpro4:9999/getfirmware"  // testing with local go server
 //#define OTA_LATEST_FIRMWARE_JSON_URL "https://github.com/Dynatrace/ufo-esp32/raw/master/firmware/version.json"
 //#define OTA_LATEST_FIRMWARE_URL "https://github.com/Dynatrace/ufo-esp32/raw/master/firmware/ufo-esp32.bin"
-#define OTA_LATEST_FIRMWARE_JSON_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/version.json"
-#define OTA_LATEST_FIRMWARE_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/ufo-esp32.bin"
+//#define OTA_LATEST_FIRMWARE_JSON_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/version.json"
+//#define OTA_LATEST_FIRMWARE_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/ufo-esp32.bin"
 
 DynamicRequestHandler::DynamicRequestHandler(Ufo* pUfo, DisplayCharter* pDCLevel1, DisplayCharter* pDCLevel2) {
 	mpUfo = pUfo;
@@ -30,13 +31,13 @@ DynamicRequestHandler::~DynamicRequestHandler() {
 
 }
 
-bool DynamicRequestHandler::HandleApiRequest(std::list<TParam>& params, HttpResponse& rResponse){
+String DynamicRequestHandler::HandleApiRequest(std::list<TParam>& params) {
+	String sBody;
 
     DynatraceAction* dtHandleRequest = mpUfo->dt.enterAction("Handle API Request");	
 
 	mpUfo->IndicateApiCall();
 
-	String sBody;
 	std::list<TParam>::iterator it = params.begin();
 	while (it != params.end()){
 
@@ -77,11 +78,9 @@ bool DynamicRequestHandler::HandleApiRequest(std::list<TParam>& params, HttpResp
 		it++;
 	}
 
-	rResponse.AddHeader(HttpResponse::HeaderNoCache);
-	rResponse.SetRetCode(200);	
 	mpUfo->dt.leaveAction(dtHandleRequest);
 
-	return rResponse.Send(sBody.c_str(), sBody.length());
+	return sBody;
 }
 
 bool DynamicRequestHandler::HandleApiListRequest(std::list<TParam>& params, HttpResponse& rResponse){
@@ -131,56 +130,68 @@ bool DynamicRequestHandler::HandleApiEditRequest(std::list<TParam>& params, Http
 bool DynamicRequestHandler::HandleInfoRequest(std::list<TParam>& params, HttpResponse& rResponse){
 
     DynatraceAction* dtHandleRequest = mpUfo->dt.enterAction("Handle Info Request");	
-
-	char sHelp[20];
-	String sBody;
-
-	sBody.reserve(512);
-	sBody.printf("{\"apmode\":\"%s\",", mpUfo->GetConfig().mbAPMode ? "1":"0");
-	sBody.printf("\"heap\":\"%d\",", esp_get_free_heap_size());
-	sBody.printf("\"ssid\":\"%s\",",  mpUfo->GetConfig().msSTASsid.c_str());
-	sBody.printf("\"hostname\":\"%s\",",  mpUfo->GetConfig().msHostname.c_str());
-	sBody.printf("\"enterpriseuser\":\"%s\",", mpUfo->GetConfig().msSTAENTUser.c_str());
-	sBody.printf("\"sslenabled\":\"%s\",", mpUfo->GetConfig().mbWebServerUseSsl ? "1":"0");
-	sBody.printf("\"listenport\":\"%d\",", mpUfo->GetConfig().muWebServerPort);
-
+	char sHelp[64];
+	String tmp;
+	cJSON *json = cJSON_CreateObject();
+	cJSON_AddStringToObject(json, "apmode", mpUfo->GetConfig().mbAPMode ? "1" : "0");
+	cJSON_AddNumberToObject(json, "heap", esp_get_free_heap_size());
+	cJSON_AddStringToObject(json, "ssid", mpUfo->GetConfig().msSTASsid.c_str());
+	cJSON_AddStringToObject(json, "hostname", mpUfo->GetConfig().msHostname.c_str());
+	cJSON_AddStringToObject(json, "enterpriseuser", mpUfo->GetConfig().msSTAENTUser.c_str());
+	cJSON_AddStringToObject(json, "sslenabled", mpUfo->GetConfig().mbWebServerUseSsl ? "1" : "0");
+	cJSON_AddNumberToObject(json, "listenport", mpUfo->GetConfig().muWebServerPort);
 	if (mpUfo->GetConfig().mbAPMode) {
-		sBody.printf("\"lastiptoap\":\"%d.%d.%d.%d\",", IP2STR((ip4_addr*)&(mpUfo->GetConfig().muLastSTAIpAddress)));
+		tmp.printf(IPSTR, IP2STR((ip4_addr*)&(mpUfo->GetConfig().muLastSTAIpAddress)));
+		cJSON_AddStringToObject(json, "lastiptoap", tmp.c_str());
 	} else {
-		sBody += "\"ipaddress\":\"";
-		sBody += mpUfo->GetWifi().GetLocalAddress();
+		cJSON_AddStringToObject(json, "ipaddress", mpUfo->GetWifi().GetLocalAddress().c_str());
+		sHelp[0] = 0;
 		mpUfo->GetWifi().GetGWAddress(sHelp);
-		sBody.printf("\",\"ipgateway\":\"%s\",", sHelp);
+		cJSON_AddStringToObject(json, "ipgateway", sHelp);
+		sHelp[0] = 0;
 		mpUfo->GetWifi().GetNetmask(sHelp);
-		sBody.printf("\"ipsubnetmask\":\"%s\",", sHelp);
-
-		uint8_t uChannel;
-		int8_t iRssi;
+		cJSON_AddStringToObject(json, "ipsubnetmask", sHelp);
+		uint8_t uChannel = 0;
+		int8_t iRssi = 0;
 		mpUfo->GetWifi().GetApInfo(iRssi, uChannel);
-		sBody.printf("\"rssi\":\"%d\",", iRssi);
-		sBody.printf("\"channel\":\"%d\",", uChannel);
+		cJSON_AddNumberToObject(json, "rssi", iRssi);
+		cJSON_AddNumberToObject(json, "channel", uChannel);
 	}
-	mpUfo->GetWifi().GetMac((__uint8_t*)sHelp);
-
-	sBody.printf("\"macaddress\":\"%x:%x:%x:%x:%x:%x\",", sHelp[0], sHelp[1], sHelp[2], sHelp[3], sHelp[4], sHelp[5]);
-	sBody.printf("\"firmwareversion\":\"%s\",", FIRMWARE_VERSION);
-	sBody.printf("\"ufoid\":\"%s\",", mpUfo->GetConfig().msUfoId.c_str());
-	sBody.printf("\"ufoname\":\"%s\",", mpUfo->GetConfig().msUfoName.c_str());
-	sBody.printf("\"organization\":\"%s\",", mpUfo->GetConfig().msOrganization.c_str());
-	sBody.printf("\"department\":\"%s\",", mpUfo->GetConfig().msDepartment.c_str());
-	sBody.printf("\"location\":\"%s\",", mpUfo->GetConfig().msLocation.c_str());
-	sBody.printf("\"dtenabled\":\"%u\",", mpUfo->GetConfig().mbDTEnabled);
-	sBody.printf("\"dtenvid\":\"%s\",", mpUfo->GetConfig().msDTEnvIdOrUrl.c_str());
-	//sBody.printf("\"dtapitoken\":\"%s\",", mpUfo->GetConfig().msDTApiToken.c_str());
-	sBody.printf("\"dtinterval\":\"%u\",", mpUfo->GetConfig().miDTInterval);
-	sBody.printf("\"dtmonitoring\":\"%u\"", mpUfo->GetConfig().mbDTMonitoring);
-	sBody += '}';
-
+	memset(sHelp, 0, 6);
+	mpUfo->GetWifi().GetMac((uint8_t*)sHelp);
+	tmp.printf("%02x:%02x:%02x:%02x:%02x:%02x", sHelp[0], sHelp[1], sHelp[2], sHelp[3], sHelp[4], sHelp[5]);
+	cJSON_AddStringToObject(json, "macaddress", tmp.c_str());
+	cJSON_AddStringToObject(json, "firmwareversion", FIRMWARE_VERSION);
+	cJSON_AddStringToObject(json, "ufoid", mpUfo->GetConfig().msUfoId.c_str());
+	cJSON_AddStringToObject(json, "ufoname", mpUfo->GetConfig().msUfoName.c_str());
+	cJSON_AddStringToObject(json, "organization", mpUfo->GetConfig().msOrganization.c_str());
+	cJSON_AddStringToObject(json, "department", mpUfo->GetConfig().msDepartment.c_str());
+	cJSON_AddStringToObject(json, "location", mpUfo->GetConfig().msLocation.c_str());
+	cJSON_AddNumberToObject(json, "dtenabled", mpUfo->GetConfig().mbDTEnabled);
+	cJSON_AddStringToObject(json, "dtenvid", mpUfo->GetConfig().msDTEnvIdOrUrl.c_str());
+	cJSON_AddNumberToObject(json, "dtinterval", mpUfo->GetConfig().miDTInterval);
+	cJSON_AddNumberToObject(json, "dtmonitoring", mpUfo->GetConfig().mbDTMonitoring);
+	cJSON_AddStringToObject(json, "mqtttopic", mpUfo->GetConfig().msMqttTopic.c_str());
+	cJSON_AddStringToObject(json, "mqttstatustopic", mpUfo->GetConfig().msMqttStatusTopic.c_str());
+	cJSON_AddNumberToObject(json, "mqttstatusperiodseconds", mpUfo->GetConfig().muMqttStatusPeriodSeconds);
+	cJSON_AddNumberToObject(json, "mqttstatusqos", mpUfo->GetConfig().muMqttStatusQos);
+	cJSON_AddStringToObject(json, "mqtturi", mpUfo->GetConfig().msMqttUri.c_str());
+	cJSON_AddStringToObject(json, "mqttpw", mpUfo->GetConfig().msMqttPw.empty() ? "" : ".....");
+	cJSON_AddStringToObject(json, "mqttservercert", mpUfo->GetConfig().msMqttServerCert.c_str());
+	cJSON_AddStringToObject(json, "mqttclientkey", mpUfo->GetConfig().msMqttClientKey.c_str());
+	cJSON_AddStringToObject(json, "mqttclientcert", mpUfo->GetConfig().msMqttClientCert.c_str());
+	char* sBody = cJSON_Print(json);
+	cJSON_Delete(json);
+	rResponse.SetRetCode(sBody ? 200 : 500);
 	rResponse.AddHeader(HttpResponse::HeaderContentTypeJson);
 	rResponse.AddHeader(HttpResponse::HeaderNoCache);
-	rResponse.SetRetCode(200);
+	bool rc = false;
+	if (sBody) {
+		rc = rResponse.Send(sBody, strlen(sBody));
+		free(sBody);
+	}
 	mpUfo->dt.leaveAction(dtHandleRequest);
-	return rResponse.Send(sBody.c_str(), sBody.length());
+	return rc;
 }
 
 bool DynamicRequestHandler::HandleDynatraceIntegrationRequest(std::list<TParam>& params, HttpResponse& rResponse){
@@ -348,6 +359,42 @@ bool DynamicRequestHandler::HandleConfigRequest(std::list<TParam>& params, HttpR
 	return rResponse.Send(sBody.c_str(), sBody.length());
 }
 
+bool DynamicRequestHandler::HandleMqttConfigRequest(std::list<TParam>& params, HttpResponse& rResponse){
+
+    DynatraceAction* dtHandleRequest = mpUfo->dt.enterAction("Handle MQTT Config Request");
+	Config& config = mpUfo->GetConfig();
+	String sBody;
+	for (auto &it : params) {
+		if (it.paramName == "mqtttopic")
+			config.msMqttTopic = it.paramValue;
+		else if (it.paramName == "mqttstatustopic")
+			config.msMqttStatusTopic = it.paramValue;
+		else if (it.paramName == "mqttstatusperiodseconds")
+			config.muMqttStatusPeriodSeconds = it.paramValue.toInt();
+		else if (it.paramName == "mqttstatusqos")
+			config.muMqttStatusQos = it.paramValue.toInt();
+		else if (it.paramName == "mqtturi")
+			config.msMqttUri = it.paramValue;
+		else if (it.paramName == "mqttpw" && it.paramValue != ".....")
+			config.msMqttPw = it.paramValue;
+		else if (it.paramName == "mqttservercert")
+			config.msMqttServerCert = it.paramValue;
+		else if (it.paramName == "mqttclientkey")
+			config.msMqttClientKey = it.paramValue;
+		else if (it.paramName == "mqttclientcert")
+			config.msMqttClientCert = it.paramValue;
+	}
+	config.Write();
+	mbRestart = true;
+	sBody = "<html><head><title>SUCCESS - firmware update succeded, rebooting shortly.</title>"
+			"<meta http-equiv=\"refresh\" content=\"10; url=/\"></head><body>"
+			"<h2>New settings stored, rebooting shortly.</h2></body></html>";
+	rResponse.SetRetCode(200);
+	rResponse.AddHeader(HttpResponse::HeaderNoCache);
+	mpUfo->dt.leaveAction(dtHandleRequest);
+	return rResponse.Send(sBody.c_str(), sBody.length());
+}
+
 bool DynamicRequestHandler::HandleSrvConfigRequest(std::list<TParam>& params, HttpResponse& rResponse){
     DynatraceAction* dtHandleRequest = mpUfo->dt.enterAction("Handle Server Config Request");	
 	const char* sSslEnabled = NULL;
@@ -436,6 +483,7 @@ bool DynamicRequestHandler::HandleFirmwareRequest(std::list<TParam>& params, Htt
 	while (it != params.end()) {
 
 		if ((*it).paramName == "progress") {
+#ifdef OTA_LATEST_FIRMWARE_JSON_URL
 			short progressPct = 0;
 			const char* progressStatus = "notyetstarted";
 			int   progress = Ota::GetProgress();
@@ -495,6 +543,11 @@ bool DynamicRequestHandler::HandleFirmwareRequest(std::list<TParam>& params, Htt
 				sBody = "Switching boot partition failed.";
 				response.SetRetCode(500);
 			}
+#else
+			sBody += "{\"session\":\"1\",\"progress\":\"0\",\"status\":\"off\"}";
+			response.AddHeader(HttpResponse::HeaderContentTypeJson);
+			response.SetRetCode(200);
+#endif
 		} else {
 				sBody = "Invalid request.";
 				response.SetRetCode(400);
@@ -512,6 +565,7 @@ bool DynamicRequestHandler::HandleCheckFirmwareRequest(std::list<TParam>& params
 	String sBody;
 	response.SetRetCode(404); // not found
 
+#ifdef OTA_LATEST_FIRMWARE_JSON_URL
 	Url url;
 	url.Parse(OTA_LATEST_FIRMWARE_JSON_URL);
 
@@ -537,6 +591,7 @@ bool DynamicRequestHandler::HandleCheckFirmwareRequest(std::list<TParam>& params
 		sBody += "\"}";
 	}
 	else
+#endif
 		sBody = "{}";
 	response.SetRetCode(200);
 	mpUfo->dt.leaveAction(dtHandleRequest);

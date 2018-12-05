@@ -13,11 +13,12 @@ public:
 	DynamicRequestHandler(Ufo* pUfo, DisplayCharter* pDCLevel1, DisplayCharter* pDCLevel2);
 	virtual ~DynamicRequestHandler();
 
-	bool HandleApiRequest(std::list<TParam>& params, HttpResponse& rResponse);
+	String HandleApiRequest(std::list<TParam>& params);
 	bool HandleApiListRequest(std::list<TParam>& params, HttpResponse& rResponse);
 	bool HandleApiEditRequest(std::list<TParam>& params, HttpResponse& rResponse);
 	bool HandleInfoRequest(std::list<TParam>& params, HttpResponse& rResponse);
 	bool HandleConfigRequest(std::list<TParam>& params, HttpResponse& rResponse);
+	bool HandleMqttConfigRequest(std::list<TParam>& params, HttpResponse& rResponse);
 	bool HandleSrvConfigRequest(std::list<TParam>& params, HttpResponse& rResponse);
 	bool HandleFirmwareRequest(std::list<TParam>& params, HttpResponse& response);
 	bool HandleCheckFirmwareRequest(std::list<TParam>& params, HttpResponse& response);

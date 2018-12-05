@@ -25,8 +25,6 @@ private:
 	bool WriteInt(nvs_handle h, const char* sKey, int bValue);
 
 public:
-	bool mbAPMode;
-
 	String msAPSsid;
 	String msAPPass;
 	String msSTASsid;
@@ -39,19 +37,29 @@ public:
 	String msOrganization;
 	String msDepartment;
 	String msLocation;
-
+	String msMqttTopic;
+	String msMqttStatusTopic;
+	uint16_t muMqttStatusPeriodSeconds = 120;
+	uint16_t muMqttStatusQos = 0;
+	uint16_t muMqttKeepalive = 30;
+	String msMqttUri;
+	String msMqttPw;
+	String msMqttServerCert;
+	String msMqttClientKey;
+	String msMqttClientCert;
+	
     String msDTEnvIdOrUrl;
     String msDTApiToken;
-	bool mbDTEnabled;
     int miDTInterval;
 
-	bool mbDTMonitoring;
-
-	bool mbWebServerUseSsl;
-	__uint16_t muWebServerPort;
+	uint32_t muLastSTAIpAddress;	
 	String msWebServerCert;
+	uint16_t muWebServerPort;
+	bool mbWebServerUseSsl;
+	bool mbDTEnabled;
+	bool mbDTMonitoring;
+	bool mbAPMode;
 
-	__uint32_t muLastSTAIpAddress;
 };
 
 #endif /* MAIN_CONFIG_H_ */

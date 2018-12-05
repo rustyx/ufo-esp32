@@ -33,9 +33,10 @@ void task_function_display(void *pvParameter)
 //----------------------------------------------------------------------------------------
 
 
-Ufo::Ufo() : mStripeLevel1(15, GPIO_NUM_16, GPIO_NUM_18), mStripeLevel2(15, GPIO_NUM_16, GPIO_NUM_17), mStripeLogo(4, GPIO_NUM_16, GPIO_NUM_19){
+Ufo::Ufo() : mStripeLevel1(15, GPIO_NUM_16, GPIO_NUM_18), mStripeLevel2(15, GPIO_NUM_16, GPIO_NUM_17), mStripeLogo(4, GPIO_NUM_16, GPIO_NUM_19),
+	mMqtt(*this)
+{
 	mServer.SetUfo(this);
-	mServer.SetDisplayCharter(&mDisplayCharterLevel1, &mDisplayCharterLevel2);
 	mWifi.SetConfig(&mConfig);
 	mWifi.SetStateDisplay(&mStateDisplay);
 	mbApiCallReceived = false;
@@ -49,7 +50,13 @@ void Ufo::Start(){
 	ESP_LOGI(LOGTAG, "Firmware Version: %s", FIRMWARE_VERSION);
 	ESP_LOGI(LOGTAG, "Start");
 
+	SetId();
 	mConfig.Read();
+	if (mConfig.msAPSsid == "UFO")
+		mConfig.msAPSsid = mId;
+	mConfig.msUfoId = mId;
+	if (mConfig.msHostname == "UFO")
+		mConfig.msHostname = mId;
 
 	DynatraceAction* dtStartup = dt.enterAction("Startup");
 
@@ -93,12 +100,12 @@ void Ufo::Start(){
 			mWifi.StartSTAMode(mConfig.msSTASsid, mConfig.msSTAPass, mConfig.msHostname);
 	
 		dt.leaveAction(dtWifi);
-		SetId();
 		// Dynatrace API Integration
 		mDt.Init(this, &mDisplayCharterLevel1, &mDisplayCharterLevel2);
 		// AWS communication layer
 		mAws.Init(this);
 	}
+	mMqtt.Init();
 	dt.leaveAction(dtStartup);
 
 }
@@ -181,9 +188,13 @@ void Ufo::ShowLogoLeds(){
 }
 
 void Ufo::SetId() {
-	char sHelp[20];
-	mWifi.GetMac((__uint8_t*)sHelp);
-	mId.printf("ufo-%x%x%x%x%x%x", sHelp[0], sHelp[1], sHelp[2], sHelp[3], sHelp[4], sHelp[5]);
+	uint8_t sMac[8]{};
+	int rc = esp_read_mac(sMac, ESP_MAC_WIFI_SOFTAP);
+	if (rc != ESP_OK) {
+		ESP_LOGE(LOGTAG, "esp_read_mac: %s", esp_err_to_name(rc));
+	}
+	mId.printf("ufo-%02x%02x%02x%02x%02x%02x", sMac[0], sMac[1], sMac[2], sMac[3], sMac[4], sMac[5]);
+	ESP_LOGI(LOGTAG, "Setting Device ID to %s", mId.c_str());
 }
 
 //-----------------------------------------------------------------------------------------

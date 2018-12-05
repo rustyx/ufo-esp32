@@ -44,7 +44,7 @@ bool UfoWebServer::StartUfoServer(){
 
 bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& httpResponse){
 
-	DynamicRequestHandler requestHandler(mpUfo, mpDisplayCharterLevel1, mpDisplayCharterLevel2);
+	DynamicRequestHandler requestHandler(mpUfo->CreateRequestHandler());
 
 	if (httpParser.GetUrl().equals("/") || httpParser.GetUrl().equals("/index.html")){
 		httpResponse.AddHeader(HttpResponse::HeaderContentTypeHtml);
@@ -81,7 +81,10 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 			return false;
 	}
 	else if (httpParser.GetUrl().equals("/api")){
-		if (!requestHandler.HandleApiRequest(httpParser.GetParams(), httpResponse))
+		String sBody{ requestHandler.HandleApiRequest(httpParser.GetParams()) };
+		httpResponse.AddHeader(HttpResponse::HeaderNoCache);
+		httpResponse.SetRetCode(200);
+		if (!httpResponse.Send(sBody.c_str(), sBody.length()))
 			return false;
 	}
 	else if (httpParser.GetUrl().equals("/apilist")){
@@ -98,6 +101,10 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 	}
 	else if (httpParser.GetUrl().equals("/config")){
 		if (!requestHandler.HandleConfigRequest(httpParser.GetParams(), httpResponse))
+			return false;
+	} 
+	else if (httpParser.GetUrl().equals("/mqttconfig")){
+		if (!requestHandler.HandleMqttConfigRequest(httpParser.GetParams(), httpResponse))
 			return false;
 	} 
 	else if (httpParser.GetUrl().equals("/srvconfig")){

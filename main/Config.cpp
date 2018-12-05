@@ -3,18 +3,13 @@
 #include "nvs_flash.h"
 #include <esp_log.h>
 
-
-#define WIFI_SSID CONFIG_WIFI_SSID
-#define WIFI_PASS CONFIG_WIFI_PASSWORD
-
-
 Config::Config() {
 	mbAPMode = true;
 	msAPSsid = "UFO";
 	msHostname = "UFO";
 
-	msSTASsid = WIFI_SSID;
-	msSTAPass = WIFI_PASS;
+	msSTASsid = "";
+	msSTAPass = "";
 
 	mbWebServerUseSsl = false;
 	muWebServerPort = 0;
@@ -57,6 +52,16 @@ bool Config::Read(){
 	ReadString(h, "Organization", msOrganization);
 	ReadString(h, "Department", msDepartment);
 	ReadString(h, "Location", msLocation);
+	ReadString(h, "MqttTopic", msMqttTopic);
+	ReadString(h, "MqttStatusTopic", msMqttStatusTopic);
+	nvs_get_u16(h, "MqttStatusPeriodSeconds", &muMqttStatusPeriodSeconds);
+	nvs_get_u16(h, "MqttStatusQos", &muMqttStatusQos);
+	nvs_get_u16(h, "MqttKeepalive", &muMqttKeepalive);
+	ReadString(h, "MqttUri", msMqttUri);
+	ReadString(h, "MqttPw", msMqttPw);
+	ReadString(h, "MqttServerCert", msMqttServerCert);
+	ReadString(h, "MqttClientKey", msMqttClientKey);
+	ReadString(h, "MqttClientCert", msMqttClientCert);
 
 	nvs_close(h);
 	return true;
@@ -121,6 +126,17 @@ bool Config::Write()
 		return nvs_close(h), false;
 	if (!WriteString(h, "Location", msLocation))
 		return nvs_close(h), false;
+
+	WriteString(h, "MqttTopic", msMqttTopic);
+	WriteString(h, "MqttStatusTopic", msMqttStatusTopic);
+	nvs_set_u16(h, "MqttStatusPeriodSeconds", muMqttStatusPeriodSeconds);
+	nvs_set_u16(h, "MqttStatusQos", muMqttStatusQos);
+	nvs_set_u16(h, "MqttKeepalive", muMqttKeepalive);
+	WriteString(h, "MqttUri", msMqttUri);
+	WriteString(h, "MqttPw", msMqttPw);
+	WriteBigString(h, "MqttServerCert", msMqttServerCert);
+	WriteBigString(h, "MqttClientKey", msMqttClientKey);
+	WriteBigString(h, "MqttClientCert", msMqttClientCert);
 
 	nvs_commit(h);
 	nvs_close(h);
