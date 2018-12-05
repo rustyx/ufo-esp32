@@ -19,12 +19,14 @@ public:
 	void SetUfo(Ufo* pUfo) { mpUfo = pUfo; };
 
 	virtual bool HandleRequest(HttpRequestParser& httpParser, HttpResponse& httpResponse);
+	bool checkAuthAdmin(HttpRequestParser& httpParser);
 
 private:
 	Ufo* mpUfo;
-	bool mbRestart;
-
+	String mAuthHeader;
+	String mAdminAuth;
 	Ota mOta;
+	bool mbRestart;
 
 };
 

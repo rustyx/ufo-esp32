@@ -58,8 +58,9 @@ public class ApiController {
                 + "\"ipsubnetmask\":\"255.255.255.0\",\"rssi\":-81,\"channel\":1,\"macaddress\":\"24:01:02:03:04:05\","
                 + "\"firmwareversion\":\"Dec32018-14:23:32\",\"ufoid\":\"ufo-id\",\"ufoname\":\"ufo-id\","
                 + "\"organization\":\"\",\"department\":\"\",\"location\":\"\",\"dtenabled\":0,\"dtenvid\":\"\","
-                + "\"dtinterval\":0,\"dtmonitoring\":0,\"mqtturi\":\"mqtts://some-host:8883\","
-                + "\"mqtttopic\":\"/topic/qos0\",\"mqttpw\":\".....\","
+                + "\"dtinterval\":0,\"dtmonitoring\":0,\"adminpw\":\"test\",\"mqtturi\":\"mqtts://some-host:8883\","
+                + "\"mqtttopic\":\"/topic/qos0\",\"mqttpw\":\".....\",\"mqttstatusperiodseconds\":66,"
+                + "\"mqttstatusqos\":0,\"mqttkeepalive\":33,"
                 + "\"mqttservercert\":\"-----BEGINCERTIFICATE-----\\ndata\\n-----ENDCERTIFICATE-----\\n\","
                 + "\"mqttclientkey\":\"\",\"mqttclientcert\":\"\"}";
     }

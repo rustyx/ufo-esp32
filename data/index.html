@@ -327,6 +327,8 @@
 					<div class="padded-full">
 						<ul class="list">
 							<li class="">
+								Admin password:<br>
+								<input type="password" name="adminpw" id="adminpw" /> 
 								<label class="checkbox">
                                 <input type="checkbox" class="" name="sslenabled" id="sslenabled">
                                 Use HTTPS (TLS)
@@ -932,6 +934,7 @@ abc1234....
 					success: function (res, xhr) {
 						//console.log(xhr.response);
 						var result = JSON.parse(xhr.response);
+						document.getElementById('adminpw').value = result.adminpw || "";
 						document.getElementById('sslenabled').checked = (result.sslenabled == '1');
 						if (result.listenport > 0)
 							document.getElementById('listenport').value = result.listenport;

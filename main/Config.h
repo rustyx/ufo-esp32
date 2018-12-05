@@ -37,6 +37,7 @@ public:
 	String msOrganization;
 	String msDepartment;
 	String msLocation;
+	String msAdminPw;
 	String msMqttTopic;
 	String msMqttStatusTopic;
 	uint16_t muMqttStatusPeriodSeconds = 120;

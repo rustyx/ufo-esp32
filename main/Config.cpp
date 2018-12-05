@@ -52,6 +52,7 @@ bool Config::Read(){
 	ReadString(h, "Organization", msOrganization);
 	ReadString(h, "Department", msDepartment);
 	ReadString(h, "Location", msLocation);
+	ReadString(h, "AdminPw", msAdminPw);
 	ReadString(h, "MqttTopic", msMqttTopic);
 	ReadString(h, "MqttStatusTopic", msMqttStatusTopic);
 	nvs_get_u16(h, "MqttStatusPeriodSeconds", &muMqttStatusPeriodSeconds);
@@ -125,6 +126,8 @@ bool Config::Write()
 	if (!WriteString(h, "Department", msDepartment))
 		return nvs_close(h), false;
 	if (!WriteString(h, "Location", msLocation))
+		return nvs_close(h), false;
+	if (!WriteString(h, "AdminPw", msAdminPw))
 		return nvs_close(h), false;
 
 	WriteString(h, "MqttTopic", msMqttTopic);

@@ -7,6 +7,7 @@
 #include <lwip/sockets.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <mbedtls/base64.h>
 
 #include "sdkconfig.h"
 #include "fontwoff.h"
@@ -37,7 +38,8 @@ bool UfoWebServer::StartUfoServer(){
 		port = mpUfo->GetConfig().muWebServerPort;
 	else
 		port = mpUfo->GetConfig().mbWebServerUseSsl ? 443 : 80;
-	
+	mAuthHeader.printf("WWW-Authenticate: Basic realm=\"%s\"", mpUfo->GetConfig().msHostname.c_str());
+	mAdminAuth.printf("admin:%s", mpUfo->GetConfig().msAdminPw.c_str());
 	return Start(port, mpUfo->GetConfig().mbWebServerUseSsl, &(mpUfo->GetConfig().msWebServerCert));		
 }
 
@@ -45,6 +47,27 @@ bool UfoWebServer::StartUfoServer(){
 bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& httpResponse){
 
 	DynamicRequestHandler requestHandler(mpUfo->CreateRequestHandler());
+
+	if (httpParser.GetUrl().equals("/api")){
+		String sBody{ requestHandler.HandleApiRequest(httpParser.GetParams()) };
+		httpResponse.AddHeader(HttpResponse::HeaderNoCache);
+		httpResponse.SetRetCode(200);
+		if (!httpResponse.Send(sBody))
+			return false;
+	}
+	else {
+		httpResponse.AddHeader(mAuthHeader.c_str());
+		if (!checkAuthAdmin(httpParser)) {
+			const char* sBody = "<!DOCTYPE html>\n<html><head>\n<title>401 Unauthorized</title>\n"
+				"</head><body>\n<h1>Unauthorized</h1>\n<p>This server could not verify that you "
+				"are authorized to access the document requested.  Either you supplied the wrong "
+				"credentials (e.g., bad password), or your browser doesn't understand how to supply "
+				"the credentials required.</p>\n</body></html>";
+			httpResponse.AddHeader(HttpResponse::HeaderNoCache);
+			httpResponse.SetRetCode(401);
+			return httpResponse.Send(sBody, strlen(sBody));
+		}
+	}
 
 	if (httpParser.GetUrl().equals("/") || httpParser.GetUrl().equals("/index.html")){
 		httpResponse.AddHeader(HttpResponse::HeaderContentTypeHtml);
@@ -78,13 +101,6 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 	}
 	else if (httpParser.GetUrl().equals("/dynatracemonitoring")){
 		if (!requestHandler.HandleDynatraceMonitoringRequest(httpParser.GetParams(), httpResponse))
-			return false;
-	}
-	else if (httpParser.GetUrl().equals("/api")){
-		String sBody{ requestHandler.HandleApiRequest(httpParser.GetParams()) };
-		httpResponse.AddHeader(HttpResponse::HeaderNoCache);
-		httpResponse.SetRetCode(200);
-		if (!httpResponse.Send(sBody.c_str(), sBody.length()))
 			return false;
 	}
 	else if (httpParser.GetUrl().equals("/apilist")){
@@ -165,4 +181,24 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 	}
 
 	return true;
+}
+
+bool UfoWebServer::checkAuthAdmin(HttpRequestParser& httpParser) {
+	if (mpUfo->GetConfig().msAdminPw.empty())
+		return true;
+	ESP_LOGD(tag, "authorization: '%s'", httpParser.Authorization().c_str());
+	size_t authlen = httpParser.Authorization().length(), decodedlen = authlen;
+	if (authlen < 7)
+		return false;
+	String decoded;
+	decoded.resize(authlen);
+	int rc;
+	if ((rc = mbedtls_base64_decode((unsigned char*)decoded.data(), authlen, &decodedlen,
+			(const unsigned char*)httpParser.Authorization().c_str() + 6, authlen - 6)) != 0) {
+		ESP_LOGD(tag, "base64_decode failed: %d", rc);
+		return false;
+	}
+	decoded.resize(decodedlen);
+	ESP_LOGD(tag, "base64 decoded: '%s', expected: '%s', match: %d", decoded.c_str(), mAdminAuth.c_str(), mAdminAuth == decoded);
+	return mAdminAuth == decoded;
 }

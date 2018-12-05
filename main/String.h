@@ -257,6 +257,9 @@ public:
     {
         return buffer ? buffer : "";  //CHANGED!!!! DONT RETURN NULL
     }
+    char *data() {
+        return buffer;
+    }
 
     // search
     int indexOf(char ch) const;

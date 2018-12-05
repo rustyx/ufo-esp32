@@ -171,6 +171,7 @@ bool DynamicRequestHandler::HandleInfoRequest(std::list<TParam>& params, HttpRes
 	cJSON_AddStringToObject(json, "dtenvid", mpUfo->GetConfig().msDTEnvIdOrUrl.c_str());
 	cJSON_AddNumberToObject(json, "dtinterval", mpUfo->GetConfig().miDTInterval);
 	cJSON_AddNumberToObject(json, "dtmonitoring", mpUfo->GetConfig().mbDTMonitoring);
+	cJSON_AddStringToObject(json, "adminpw", mpUfo->GetConfig().msAdminPw.empty() ? "" : ".....");
 	cJSON_AddStringToObject(json, "mqtttopic", mpUfo->GetConfig().msMqttTopic.c_str());
 	cJSON_AddStringToObject(json, "mqttstatustopic", mpUfo->GetConfig().msMqttStatusTopic.c_str());
 	cJSON_AddNumberToObject(json, "mqttstatusperiodseconds", mpUfo->GetConfig().muMqttStatusPeriodSeconds);
@@ -178,8 +179,9 @@ bool DynamicRequestHandler::HandleInfoRequest(std::list<TParam>& params, HttpRes
 	cJSON_AddStringToObject(json, "mqtturi", mpUfo->GetConfig().msMqttUri.c_str());
 	cJSON_AddStringToObject(json, "mqttpw", mpUfo->GetConfig().msMqttPw.empty() ? "" : ".....");
 	cJSON_AddStringToObject(json, "mqttservercert", mpUfo->GetConfig().msMqttServerCert.c_str());
-	cJSON_AddStringToObject(json, "mqttclientkey", mpUfo->GetConfig().msMqttClientKey.c_str());
+	cJSON_AddStringToObject(json, "mqttclientkey", mpUfo->GetConfig().msMqttClientKey.empty() ? "" : ".....");
 	cJSON_AddStringToObject(json, "mqttclientcert", mpUfo->GetConfig().msMqttClientCert.c_str());
+	cJSON_AddNumberToObject(json, "mqttkeepalive", mpUfo->GetConfig().muMqttKeepalive);
 	char* sBody = cJSON_Print(json);
 	cJSON_Delete(json);
 	rResponse.SetRetCode(sBody ? 200 : 500);
@@ -379,10 +381,12 @@ bool DynamicRequestHandler::HandleMqttConfigRequest(std::list<TParam>& params, H
 			config.msMqttPw = it.paramValue;
 		else if (it.paramName == "mqttservercert")
 			config.msMqttServerCert = it.paramValue;
-		else if (it.paramName == "mqttclientkey")
+		else if (it.paramName == "mqttclientkey" && it.paramValue != ".....")
 			config.msMqttClientKey = it.paramValue;
 		else if (it.paramName == "mqttclientcert")
 			config.msMqttClientCert = it.paramValue;
+		else if (it.paramName == "mqttkeepalive")
+			config.muMqttKeepalive = it.paramValue.toInt();
 	}
 	config.Write();
 	mbRestart = true;
@@ -404,17 +408,17 @@ bool DynamicRequestHandler::HandleSrvConfigRequest(std::list<TParam>& params, Ht
 
 	String sBody;
 
-	std::list<TParam>::iterator it = params.begin();
-	while (it != params.end()){
-		if ((*it).paramName == "sslenabled")
-			sSslEnabled = (*it).paramValue.c_str();
-		else if ((*it).paramName == "listenport")
-			sListenPort = (*it).paramValue.c_str();
-		else if ((*it).paramName == "servercert")
-			sServerCert = (*it).paramValue.c_str();
-		else if ((*it).paramName == "currenthost")
-			sCurrentHost = (*it).paramValue.c_str();
-		it++;
+	for (auto &it : params) {
+		if (it.paramName == "sslenabled")
+			sSslEnabled = it.paramValue.c_str();
+		else if (it.paramName == "listenport")
+			sListenPort = it.paramValue.c_str();
+		else if (it.paramName == "servercert" && (it.paramValue.empty() || it.paramValue.length() > 256))
+			sServerCert = it.paramValue.c_str();
+		else if (it.paramName == "currenthost")
+			sCurrentHost = it.paramValue.c_str();
+		else if (it.paramName == "adminpw")
+			mpUfo->GetConfig().msAdminPw = it.paramValue;
 	}
 	mpUfo->GetConfig().mbWebServerUseSsl = (sSslEnabled != NULL);
 	mpUfo->GetConfig().muWebServerPort = atoi(sListenPort);

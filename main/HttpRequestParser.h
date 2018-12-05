@@ -21,6 +21,7 @@
 #define STATE_CopyBody					11
 #define STATE_ProcessMultipartBodyStart	12
 #define STATE_ProcessMultipartBody		13
+#define STATE_ReadAuthorization			14
 
 
 class DownAndUploadHandler;
@@ -46,6 +47,7 @@ public:
 	String& GetUrl() 	{ return mUrl; };
 	String& GetBody()  { return mBody; };
 	String& GetBoundary() { return mBoundary; }
+	String& Authorization() { return mAuthorization; }
 	std::list<TParam>& GetParams() { return mParams; };
 
 	void SetError(__uint8_t u) { muError = u; mbFinished = true; };
@@ -61,6 +63,7 @@ private:
 
 	String mBody;
 	String mBoundary;
+	String mAuthorization;
 	__uint32_t muContentLength;
 	__uint32_t muActBodyLength;
 	DownAndUploadHandler* mpUploadHandler;

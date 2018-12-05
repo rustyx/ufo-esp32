@@ -107,6 +107,7 @@ bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
 					muParseState = STATE_CheckHeaderName;
 					mStringParser.Init();
 					mStringParser.AddStringToParse("connection");
+					mStringParser.AddStringToParse("authorization");
 					if (!mbIsGet){
 						mStringParser.AddStringToParse("content-length");
 						mStringParser.AddStringToParse("content-type");
@@ -156,11 +157,15 @@ bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
 								mStringParser.AddStringToParse("close");
 								mStringParser.AddStringToParse("keep-alive");
 								break;
-							case 1: //content-length
+							case 1: //authorization
+								muParseState = STATE_ReadAuthorization;
+								mAuthorization.clear();
+								break;
+							case 2: //content-length
 								muParseState = STATE_ReadContentLength;
 								muContentLength = 0;
 								break;
-							case 2: //content-type
+							case 3: //content-type
 								muParseState = STATE_CheckHeaderValue;
 								mStringParser.Init();
 								mStringParser.AddStringToParse("multipart/form-data");
@@ -223,6 +228,15 @@ bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
 						muContentLength *= 10;
 						muContentLength += c - '0';
 					}
+				}
+				break;
+			case STATE_ReadAuthorization:
+				if ((c == 10) || (c == 13)){
+					muCrlfCount = 1;
+					muParseState = STATE_SearchEndOfHeaderLine;
+				}
+				else if (c != ' ' || !mAuthorization.empty()) {
+					mAuthorization += c;
 				}
 				break;
 			case STATE_SearchBoundary:
