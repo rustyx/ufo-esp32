@@ -139,6 +139,7 @@ void Wifi::Connect()
 	if (!msUser.length())
 		memcpy(config.sta.password, msPass.c_str(), msPass.length());
 	esp_wifi_set_config(ESP_IF_WIFI_STA, &config);
+	esp_wifi_set_ps(WIFI_PS_NONE);
 
 	if (msUser.length())
 	{ //Enterprise WPA2
@@ -180,6 +181,7 @@ void Wifi::StartAP()
 	config.ap.max_connection = 4;
 	config.ap.beacon_interval = 100;
 	esp_wifi_set_config(WIFI_IF_AP, &config);
+	esp_wifi_set_ps(WIFI_PS_NONE);
 	esp_wifi_start();
 }
 
