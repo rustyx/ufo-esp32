@@ -30,6 +30,12 @@ UfoWebServer::~UfoWebServer() {
 
 bool UfoWebServer::StartUfoServer(){
 
+	mAuthHeader.printf("WWW-Authenticate: Basic realm=\"%s\"", mpUfo->GetConfig().msHostname.c_str());
+	if (mpUfo->GetConfig().msAdminPw.empty())
+		mAdminAuth.clear();
+	else
+		mAdminAuth.printf("admin:%s", mpUfo->GetConfig().msAdminPw.c_str());
+
 	if (mpUfo->GetConfig().mbAPMode)
 		return Start(80, false, NULL);	
 	
@@ -38,8 +44,6 @@ bool UfoWebServer::StartUfoServer(){
 		port = mpUfo->GetConfig().muWebServerPort;
 	else
 		port = mpUfo->GetConfig().mbWebServerUseSsl ? 443 : 80;
-	mAuthHeader.printf("WWW-Authenticate: Basic realm=\"%s\"", mpUfo->GetConfig().msHostname.c_str());
-	mAdminAuth.printf("admin:%s", mpUfo->GetConfig().msAdminPw.c_str());
 	return Start(port, mpUfo->GetConfig().mbWebServerUseSsl, &(mpUfo->GetConfig().msWebServerCert));		
 }
 
@@ -52,10 +56,9 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 		String sBody{ requestHandler.HandleApiRequest(httpParser.GetParams()) };
 		httpResponse.AddHeader(HttpResponse::HeaderNoCache);
 		httpResponse.SetRetCode(200);
-		if (!httpResponse.Send(sBody))
-			return false;
+		return httpResponse.Send(sBody);
 	}
-	else {
+	if (!mAdminAuth.empty()) {
 		httpResponse.AddHeader(mAuthHeader.c_str());
 		if (!checkAuthAdmin(httpParser)) {
 			const char* sBody = "<!DOCTYPE html>\n<html><head>\n<title>401 Unauthorized</title>\n"
@@ -68,7 +71,6 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 			return httpResponse.Send(sBody, strlen(sBody));
 		}
 	}
-
 	if (httpParser.GetUrl().equals("/") || httpParser.GetUrl().equals("/index.html")){
 		httpResponse.AddHeader(HttpResponse::HeaderContentTypeHtml);
 		httpResponse.AddHeader("Content-Encoding: gzip");
