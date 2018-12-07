@@ -83,7 +83,7 @@ bool HttpResponse::Send(const char* sBody, __uint16_t uBodyLen){
 	return true;
 }
 
-bool HttpResponse::SendInternal(const char* sData, __uint16_t uLen){
+inline bool HttpResponse::SendInternal(const char* sData, __uint16_t uLen){
 
 	if (mpSsl){
 		return  SSL_write(mpSsl, sData, uLen) > 0;
@@ -101,7 +101,7 @@ const char* HttpResponse::GetResponseMsg(__uint16_t uRetCode, __uint8_t& ruLen){
 			ruLen = 20;
 			return " Moved Permanently\r\n";
 		case 302:
-			ruLen = 20;
+			ruLen = 8;
 			return " Found\r\n";
 		case 304:
 			ruLen = 15;
@@ -120,7 +120,7 @@ const char* HttpResponse::GetResponseMsg(__uint16_t uRetCode, __uint8_t& ruLen){
 	return " Unknown\r\n";
 }
 
-__uint8_t HttpResponse::Number2String(__uint16_t uNum, char* sBuf){
+inline __uint8_t HttpResponse::Number2String(__uint16_t uNum, char* sBuf){
 	char sHelp[10];
 	__uint8_t uPos = 0;
 
