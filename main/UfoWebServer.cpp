@@ -30,11 +30,10 @@ UfoWebServer::~UfoWebServer() {
 
 bool UfoWebServer::StartUfoServer(){
 
-	mAuthHeader.printf("WWW-Authenticate: Basic realm=\"%s\"", mpUfo->GetConfig().msHostname.c_str());
-	if (mpUfo->GetConfig().msAdminPw.empty())
-		mAdminAuth.clear();
-	else
+	if (!mpUfo->GetConfig().msAdminPw.empty()) {
+		mAuthHeader.printf("WWW-Authenticate: Basic realm=\"%s\"", mpUfo->GetConfig().msHostname.c_str());
 		mAdminAuth.printf("admin:%s", mpUfo->GetConfig().msAdminPw.c_str());
+	}
 
 	if (mpUfo->GetConfig().mbAPMode)
 		return Start(80, false, NULL);	
@@ -58,7 +57,7 @@ bool UfoWebServer::HandleRequest(HttpRequestParser& httpParser, HttpResponse& ht
 		httpResponse.SetRetCode(200);
 		return httpResponse.Send(sBody);
 	}
-	if (!mAdminAuth.empty()) {
+	if (!mAuthHeader.empty()) {
 		httpResponse.AddHeader(mAuthHeader.c_str());
 		if (!checkAuthAdmin(httpParser)) {
 			const char* sBody = "<!DOCTYPE html>\n<html><head>\n<title>401 Unauthorized</title>\n"

@@ -2,6 +2,7 @@
 #include "Ufo.h"
 #include <mqtt_client.h>
 #include <esp_log.h>
+#include <time.h>
 #include <cJSON.h>
 
 static const char* LOGTAG = "MQTT";
@@ -58,14 +59,30 @@ void MQTTIntegration::TaskInit() {
     mClient = esp_mqtt_client_init(&mClientConfig);
     esp_mqtt_client_start(mClient);
     ESP_LOGI(LOGTAG, "Started");
-    if (!mUfo.GetConfig().msMqttStatusTopic.empty() && mUfo.GetConfig().muMqttStatusPeriodSeconds > 0) {
-        const uint32_t delay = std::max<int>(2, mUfo.GetConfig().muMqttStatusPeriodSeconds) * 1000 / portTICK_PERIOD_MS;
+    const uint32_t delay = mUfo.GetConfig().msMqttStatusTopic.empty() ? 0 : mUfo.GetConfig().muMqttStatusPeriodSeconds;
+    if (!mUfo.GetConfig().msMqttErrorState.empty() || delay > 0) {
+        ESP_LOGD(LOGTAG, "delay=%u, error state=%s", delay, mUfo.GetConfig().msMqttErrorState.c_str());
+        struct timeval next{}, now{};
+        gettimeofday(&next, nullptr);
+        bool error = false;
         while (mActive) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            gettimeofday(&now, nullptr);
             if (mbConnected) {
-                SendStatus();
-                vTaskDelay(delay);
+                if (delay && now.tv_sec >= next.tv_sec) {
+                    SendStatus();
+                    next.tv_sec = now.tv_sec + delay;
+                }
+                error = false;
             } else {
-                vTaskDelay(2000 / portTICK_PERIOD_MS);
+                mInitNeeded = true;
+                next.tv_sec = now.tv_sec;
+                if (!error && mUfo.IsActive()) {
+                    if (!mUfo.GetConfig().msMqttErrorState.empty()) {
+                        HandleCommand(mUfo.GetConfig().msMqttErrorState.c_str());
+                    }
+                    error = true;
+                }
             }
         }
     }
@@ -74,6 +91,9 @@ void MQTTIntegration::TaskInit() {
 void MQTTIntegration::SendStatus() {
     String sPayload;
     sPayload.printf("{\"timestamp\":\"%u\",", esp_log_timestamp());
+    if (mInitNeeded) {
+        sPayload.printf("\"init\":\"1\",");
+    }
     sPayload.printf("\"device\":{\"id\":\"%s\",", mUfo.GetId().c_str());
     sPayload.printf("\"clientIP\":\"%s\",", mUfo.GetWifi().GetLocalAddress().c_str());
     sPayload.printf("\"freemem\":\"%u\"}}", esp_get_free_heap_size());
@@ -88,7 +108,7 @@ esp_err_t MQTTIntegration::HandleEvent(esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             mbConnected = true;
-            msg_id = esp_mqtt_client_subscribe(mClient, mUfo.GetConfig().msMqttTopic.c_str(), 0);
+            msg_id = esp_mqtt_client_subscribe(mClient, mUfo.GetConfig().msMqttTopic.c_str(), mUfo.GetConfig().muMqttQos);
             ESP_LOGI(LOGTAG, "Connected, subscribing to %s, msg_id=%d", mUfo.GetConfig().msMqttTopic.c_str(), msg_id);
             break;
         case MQTT_EVENT_DISCONNECTED:
@@ -161,29 +181,34 @@ static inline void parseParams(const String& data, std::list<TParam>& params) {
 }
 
 void MQTTIntegration::HandleMessage(String data) {
-    DynamicRequestHandler handler{ mUfo.CreateRequestHandler() };
     const char* end = nullptr;
     cJSON *json = cJSON_ParseWithOpts(data.c_str(), &end, 0);
     if (!json) {
         ESP_LOGE(LOGTAG, "json parse error at position %d", (end ? end - data.c_str() : 0));
         return;
     }
-    auto *command = cJSON_GetObjectItemCaseSensitive(json, "command");
+    mInitNeeded = false;
+    cJSON *command = cJSON_GetObjectItemCaseSensitive(json, "command");
     if (cJSON_IsString(command) && command->valuestring) {
-        std::list<TParam> params;
-        parseParams(command->valuestring, params);
-        /*
-        String temp;
-        for (auto &it : params) {
-            if (!temp.empty())
-                temp += ", ";
-            temp += it.paramName;
-            temp += '=';
-            temp += it.paramValue;
-        }
-        ESP_LOGI(LOGTAG, "Handling api request: %s", temp.c_str());
-        //*/
-        handler.HandleApiRequest(params);
+        HandleCommand(command->valuestring);
     }
     cJSON_Delete(json);
+}
+
+void MQTTIntegration::HandleCommand(const char * command) {
+    DynamicRequestHandler handler{ mUfo.CreateRequestHandler() };
+    std::list<TParam> params;
+    parseParams(command, params);
+    /*
+    String temp;
+    for (auto &it : params) {
+        if (!temp.empty())
+            temp += ", ";
+        temp += it.paramName;
+        temp += '=';
+        temp += it.paramValue;
+    }
+    ESP_LOGI(LOGTAG, "Handling api request: %s", temp.c_str());
+    //*/
+    handler.HandleApiRequest(params);
 }

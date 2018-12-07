@@ -3,6 +3,8 @@
 #include "nvs_flash.h"
 #include <esp_log.h>
 
+static const char LOGTAG[] = "Config";
+
 Config::Config() {
 	mbAPMode = true;
 	msAPSsid = "UFO";
@@ -30,10 +32,13 @@ bool Config::Read(){
 		return false;
 	if (nvs_open("Ufo Config", NVS_READONLY, &h) != ESP_OK)
 		return false;
+	/*
+	 * max key length = 15 characters!
+	 */
 	ReadBool(h, "APMode", mbAPMode);
 	ReadString(h, "APSsid", msAPSsid);
 	ReadString(h, "APPass", msAPPass);
-	nvs_get_u32(h, "STAIpAddress", &muLastSTAIpAddress);
+	ReadInt(h, "STAIpAddress", muLastSTAIpAddress);
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "STAENTUser", msSTAENTUser);
@@ -45,7 +50,7 @@ bool Config::Read(){
 	ReadInt(h, "DTInterval", miDTInterval);
 	ReadBool(h, "DTMonitoring", mbDTMonitoring);
 	ReadBool(h, "SrvSSLEnabled", mbWebServerUseSsl);
-	nvs_get_u16(h, "SrvListenPort", &muWebServerPort);
+	ReadShort(h, "SrvListenPort", muWebServerPort);
 	ReadString(h, "SrvCert", msWebServerCert);
 	ReadString(h, "UfoId", msUfoId);
 	ReadString(h, "UfoName", msUfoName);
@@ -55,14 +60,16 @@ bool Config::Read(){
 	ReadString(h, "AdminPw", msAdminPw);
 	ReadString(h, "MqttTopic", msMqttTopic);
 	ReadString(h, "MqttStatusTopic", msMqttStatusTopic);
-	nvs_get_u16(h, "MqttStatusPeriodSeconds", &muMqttStatusPeriodSeconds);
-	nvs_get_u16(h, "MqttStatusQos", &muMqttStatusQos);
-	nvs_get_u16(h, "MqttKeepalive", &muMqttKeepalive);
+	ReadShort(h, "MqttStPeriod", muMqttStatusPeriodSeconds);
+	ReadShort(h, "MqttStatusQos", muMqttStatusQos);
+	ReadShort(h, "MqttQos", muMqttQos);
+	ReadShort(h, "MqttKeepalive", muMqttKeepalive);
 	ReadString(h, "MqttUri", msMqttUri);
 	ReadString(h, "MqttPw", msMqttPw);
-	ReadString(h, "MqttServerCert", msMqttServerCert);
-	ReadString(h, "MqttClientKey", msMqttClientKey);
-	ReadString(h, "MqttClientCert", msMqttClientCert);
+	ReadBigString(h, "MqttServerCert", msMqttServerCert);
+	ReadBigString(h, "MqttClientKey", msMqttClientKey);
+	ReadBigString(h, "MqttClientCert", msMqttClientCert);
+	ReadString(h, "MqttErrorState", msMqttErrorState);
 
 	nvs_close(h);
 	return true;
@@ -95,7 +102,7 @@ bool Config::Write()
 		return nvs_close(h), false;
 	if (!WriteBigString(h, "STAENTCA", msSTAENTCA))
 		return nvs_close(h), false;
-	if (nvs_set_u32(h, "STAIpAddress", muLastSTAIpAddress) != ESP_OK)
+	if (!WriteInt(h, "STAIpAddress", muLastSTAIpAddress))
 		return nvs_close(h), false;
 
 	if (!WriteBool(h, "DTEnabled", mbDTEnabled))
@@ -112,7 +119,7 @@ bool Config::Write()
 
 	if (!WriteBool(h, "SrvSSLEnabled", mbWebServerUseSsl))	
 		return nvs_close(h), false;
-	if (nvs_set_u16(h, "SrvListenPort", muWebServerPort) != ESP_OK)
+	if (!WriteShort(h, "SrvListenPort", muWebServerPort))
 		return nvs_close(h), false;
 	if (!WriteString(h, "SrvCert", msWebServerCert))
 		return nvs_close(h), false;
@@ -132,14 +139,16 @@ bool Config::Write()
 
 	WriteString(h, "MqttTopic", msMqttTopic);
 	WriteString(h, "MqttStatusTopic", msMqttStatusTopic);
-	nvs_set_u16(h, "MqttStatusPeriodSeconds", muMqttStatusPeriodSeconds);
-	nvs_set_u16(h, "MqttStatusQos", muMqttStatusQos);
-	nvs_set_u16(h, "MqttKeepalive", muMqttKeepalive);
+	WriteShort(h, "MqttStPeriod", muMqttStatusPeriodSeconds);
+	WriteShort(h, "MqttStatusQos", muMqttStatusQos);
+	WriteShort(h, "MqttQos", muMqttQos);
+	WriteShort(h, "MqttKeepalive", muMqttKeepalive);
 	WriteString(h, "MqttUri", msMqttUri);
 	WriteString(h, "MqttPw", msMqttPw);
 	WriteBigString(h, "MqttServerCert", msMqttServerCert);
 	WriteBigString(h, "MqttClientKey", msMqttClientKey);
 	WriteBigString(h, "MqttClientCert", msMqttClientCert);
+	WriteString(h, "MqttErrorState", msMqttErrorState);
 
 	nvs_commit(h);
 	nvs_close(h);
@@ -182,25 +191,38 @@ bool Config::ReadBigString(nvs_handle h, const char* sKey, String& rsValue){
 }
 
 bool Config::ReadBool(nvs_handle h, const char* sKey, bool& rbValue){
-	__uint8_t u;
-	if (nvs_get_u8(h, sKey, &u) != ESP_OK)
+	uint8_t u = 0;
+	esp_err_t rc = nvs_get_u8(h, sKey, &u);
+	if (rc != ESP_OK) {
+		ESP_LOGW(LOGTAG, "nvs_get_u8(%s) failed: %s", sKey, esp_err_to_name(rc));
 		return false;
-	rbValue = u ? true : false;
+	}
+	rbValue = u;
 	return true;
 }
 
-bool Config::ReadInt(nvs_handle h, const char* sKey, int& riValue){
-	__uint32_t u;
-	if (nvs_get_u32(h, sKey, &u) != ESP_OK)
+bool Config::ReadInt(nvs_handle h, const char* sKey, uint32_t& riValue){
+	esp_err_t rc = nvs_get_u32(h, sKey, &riValue);
+	if (rc != ESP_OK) {
+		ESP_LOGW(LOGTAG, "nvs_get_u32(%s) failed: %s", sKey, esp_err_to_name(rc));
 		return false;
-	riValue = u;
+	}
+	return true;
+}
+
+bool Config::ReadShort(nvs_handle h, const char* sKey, uint16_t& riValue){
+	esp_err_t rc = nvs_get_u16(h, sKey, &riValue);
+	if (rc != ESP_OK) {
+		ESP_LOGW(LOGTAG, "nvs_get_u16(%s) failed: %s", sKey, esp_err_to_name(rc));
+		return false;
+	}
 	return true;
 }
 
 bool Config::WriteString(nvs_handle h, const char* sKey, String& rsValue){
-	esp_err_t err = nvs_set_str(h, sKey, rsValue.c_str());
-	if (err != ESP_OK){
-		ESP_LOGE("Config", "  <%s>%d -> %d", sKey, rsValue.length(), err);
+	esp_err_t rc = nvs_set_str(h, sKey, rsValue.c_str());
+	if (rc != ESP_OK) {
+		ESP_LOGE(LOGTAG, "nvs_set_str(%s) failed: %s", sKey, esp_err_to_name(rc));
 		return false;
 	}
 	return true;
@@ -227,9 +249,28 @@ bool Config::WriteBigString(nvs_handle h, const char* sKey, String& rsValue){
 
 
 bool Config:: WriteBool(nvs_handle h, const char* sKey, bool bValue){
-	return (nvs_set_u8(h, sKey, bValue ? 1 : 0) == ESP_OK);
+	esp_err_t rc = nvs_set_u8(h, sKey, bValue ? 1 : 0);
+	if (rc != ESP_OK) {
+		ESP_LOGE(LOGTAG, "nvs_set_u8(%s) failed: %s", sKey, esp_err_to_name(rc));
+		return false;
+	}
+	return true;
 }
 
-bool Config:: WriteInt(nvs_handle h, const char* sKey, int iValue){
-	return (nvs_set_u32(h, sKey, iValue) == ESP_OK);
+bool Config:: WriteInt(nvs_handle h, const char* sKey, uint32_t iValue){
+	esp_err_t rc = nvs_set_u32(h, sKey, iValue);
+	if (rc != ESP_OK) {
+		ESP_LOGE(LOGTAG, "nvs_set_u32(%s) failed: %s", sKey, esp_err_to_name(rc));
+		return false;
+	}
+	return true;
+}
+
+bool Config:: WriteShort(nvs_handle h, const char* sKey, uint16_t iValue){
+	esp_err_t rc = nvs_set_u16(h, sKey, iValue);
+	if (rc != ESP_OK) {
+		ESP_LOGE(LOGTAG, "nvs_set_u16(%s) failed: %s", sKey, esp_err_to_name(rc));
+		return false;
+	}
+	return true;
 }

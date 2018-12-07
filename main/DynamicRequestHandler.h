@@ -10,8 +10,8 @@ class DisplayCharter;
 
 class DynamicRequestHandler {
 public:
-	DynamicRequestHandler(Ufo* pUfo, DisplayCharter* pDCLevel1, DisplayCharter* pDCLevel2);
-	virtual ~DynamicRequestHandler();
+	DynamicRequestHandler(Ufo* pUfo) : mpUfo(pUfo) {}
+	virtual ~DynamicRequestHandler() {}
 
 	String HandleApiRequest(std::list<TParam>& params);
 	bool HandleApiListRequest(std::list<TParam>& params, HttpResponse& rResponse);
@@ -29,10 +29,8 @@ public:
 
 private:
 	Ufo* mpUfo;
-	DisplayCharter* mpDisplayCharterLevel1;
-	DisplayCharter* mpDisplayCharterLevel2;
 
-	bool mbRestart;
+	bool mbRestart = false;
 };
 
 #endif /* MAIN_DYNAMICREQUESTHANDLER_H_ */

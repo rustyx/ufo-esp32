@@ -286,10 +286,6 @@
 							<input type="text" name="mqtttopic" id="mqtttopic" />
 							MQTT status topic (optional):<br>
 							<input type="text" name="mqttstatustopic" id="mqttstatustopic" />
-							MQTT status message frequency (seconds):<br>
-							<input type="number" name="mqttstatusperiodseconds" id="mqttstatusperiodseconds" />
-							MQTT status QoS (0/1):<br>
-							<input type="number" name="mqttstatusqos" id="mqttstatusqos" />
 							MQTT URI (e.g. mqtts://[user[:pass]@]host:port. Supported protocols: mqtt:// mqtts:// ws:// wss://):<br>
 							<input type="url" name="mqtturi" id="mqtturi" />
 							MQTT password (optional):<br>
@@ -300,8 +296,16 @@
 							<textarea name="mqttclientkey" id="mqttclientkey" style='Height:90px'></textarea>
 							Client Certificate (optional)
 							<textarea name="mqttclientcert" id="mqttclientcert" style='Height:90px'></textarea>
+							MQTT QoS (0/1):<br>
+							<input type="number" name="mqttqos" id="mqttqos" />
+							MQTT status message QoS (0/1):<br>
+							<input type="number" name="mqttstatusqos" id="mqttstatusqos" />
+							MQTT status message frequency (seconds):<br>
+							<input type="number" name="mqttstatusperiodseconds" id="mqttstatusperiodseconds" />
 							MQTT keep-alive (seconds):<br>
 							<input type="number" name="mqttkeepalive" id="mqttkeepalive" />
+							MQTT error state (optional, e.g. logo=000000|c00000|000000|c00000&amp;top_init&amp;bottom_init):<br>
+							<input type="text" name="mqtterrorstate" id="mqtterrorstate" />
 						</ul>
 					</div>
 					<div class="padded-full">
@@ -896,12 +900,14 @@ abc1234....
 						document.getElementById('mqttstatustopic').value = result.mqttstatustopic || "";
 						document.getElementById('mqttstatusperiodseconds').value = result.mqttstatusperiodseconds || "120";
 						document.getElementById('mqttstatusqos').value = result.mqttstatusqos || "0";
+						document.getElementById('mqttqos').value = result.mqttqos || "0";
 						document.getElementById('mqttkeepalive').value = result.mqttkeepalive || "30";
 						document.getElementById('mqtturi').value = result.mqtturi || "";
 						document.getElementById('mqttpw').value = result.mqttpw || "";
 						document.getElementById('mqttservercert').value = result.mqttservercert || "";
 						document.getElementById('mqttclientkey').value = result.mqttclientkey || "";
 						document.getElementById('mqttclientcert').value = result.mqttclientcert || "";
+						document.getElementById('mqtterrorstate').value = result.mqtterrorstate || "";
 					},
 					error: function (res, flagError, xhr) {
 						console.error(flagError);

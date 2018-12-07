@@ -272,9 +272,11 @@ void WebServer::WebRequestHandler(int socket, int conNumber){
 		else
 			httpResponse.Init(socket, httpParser.IsHttp11(), httpParser.IsConnectionClose());
 
-		if (!HandleRequest(httpParser, httpResponse))
+		if (!HandleRequest(httpParser, httpResponse)) {
+			ESP_LOGD(tag, "HandleRequest failed");
 			break;
-		
+		}
+
 		if (httpParser.IsConnectionClose()){
 			close(socket);
 			break;

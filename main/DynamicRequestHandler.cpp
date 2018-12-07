@@ -19,18 +19,6 @@ static char tag[] = "DynamicRequestHandler";
 //#define OTA_LATEST_FIRMWARE_JSON_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/version.json"
 //#define OTA_LATEST_FIRMWARE_URL "https://raw.githubusercontent.com/Dynatrace/ufo-esp32/master/firmware/ufo-esp32.bin"
 
-DynamicRequestHandler::DynamicRequestHandler(Ufo* pUfo, DisplayCharter* pDCLevel1, DisplayCharter* pDCLevel2) {
-	mpUfo = pUfo;
-	mpDisplayCharterLevel1 = pDCLevel1;
-	mpDisplayCharterLevel2 = pDCLevel2;
-
-	mbRestart = false;
-}
-
-DynamicRequestHandler::~DynamicRequestHandler() {
-
-}
-
 String DynamicRequestHandler::HandleApiRequest(std::list<TParam>& params) {
 	String sBody;
 
@@ -42,32 +30,32 @@ String DynamicRequestHandler::HandleApiRequest(std::list<TParam>& params) {
 	while (it != params.end()){
 
 		if ((*it).paramName == "top_init")
-			mpDisplayCharterLevel1->Init();
+			mpUfo->DisplayCharterLevel1().Init();
 		else if ((*it).paramName == "top"){
 			__uint16_t i = 0;
 			 while (i < (*it).paramValue.length())
-				 i = mpDisplayCharterLevel1->ParseLedArg((*it).paramValue, i);
+				 i = mpUfo->DisplayCharterLevel1().ParseLedArg((*it).paramValue, i);
 		}
 		else if ((*it).paramName == "top_bg")
-			mpDisplayCharterLevel1->ParseBgArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel1().ParseBgArg((*it).paramValue);
 		else if ((*it).paramName == "top_whirl")
-			mpDisplayCharterLevel1->ParseWhirlArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel1().ParseWhirlArg((*it).paramValue);
 		else if ((*it).paramName == "top_morph")
-			mpDisplayCharterLevel1->ParseMorphArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel1().ParseMorphArg((*it).paramValue);
 
 		if ((*it).paramName == "bottom_init")
-			mpDisplayCharterLevel2->Init();
+			mpUfo->DisplayCharterLevel2().Init();
 		else if ((*it).paramName == "bottom"){
 			__uint16_t i = 0;
 			 while (i < (*it).paramValue.length())
-				 i = mpDisplayCharterLevel2->ParseLedArg((*it).paramValue, i);
+				 i = mpUfo->DisplayCharterLevel2().ParseLedArg((*it).paramValue, i);
 		}
 		else if ((*it).paramName == "bottom_bg")
-			mpDisplayCharterLevel2->ParseBgArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel2().ParseBgArg((*it).paramValue);
 		else if ((*it).paramName == "bottom_whirl")
-			mpDisplayCharterLevel2->ParseWhirlArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel2().ParseWhirlArg((*it).paramValue);
 		else if ((*it).paramName == "bottom_morph")
-			mpDisplayCharterLevel2->ParseMorphArg((*it).paramValue);
+			mpUfo->DisplayCharterLevel2().ParseMorphArg((*it).paramValue);
 
 		else if ((*it).paramName == "logo")
 			mpUfo->GetLogoDisplay().ParseLogoLedArg((*it).paramValue);
@@ -100,30 +88,32 @@ bool DynamicRequestHandler::HandleApiEditRequest(std::list<TParam>& params, Http
 	const char* sNewApi = NULL;
 	bool bDelete = false;
 
-	std::list<TParam>::iterator it = params.begin();
-	while (it != params.end()){
-
-		if ((*it).paramName == "apiid")
-			uId = strtol((*it).paramValue.c_str(), NULL, 10) - 1;
-		else if ((*it).paramName == "apiedit")
-			sNewApi = (*it).paramValue.c_str();
-		else if ((*it).paramName == "delete")
+	rResponse.SetRetCode(302);
+	String sBody = "Updated";
+	for (auto &it : params) {
+		if (it.paramName == "apiid")
+			uId = it.paramValue.toInt() - 1;
+		else if (it.paramName == "apiedit")
+			sNewApi = it.paramValue.c_str();
+		else if (it.paramName == "delete")
 			bDelete = true;
-		it++;
 	}
-	if (bDelete){
-		if (!mpUfo->GetApiStore().DeleteApi(uId))
+	if (bDelete) {
+		if (!mpUfo->GetApiStore().DeleteApi(uId)) {
 			rResponse.SetRetCode(500);
+			sBody = "DeleteApi failed";
+		}
 	}
-	else{
-		if (!mpUfo->GetApiStore().SetApi(uId, sNewApi))
+	else {
+		if (!mpUfo->GetApiStore().SetApi(uId, sNewApi)) {
 			rResponse.SetRetCode(500);
+			sBody = "SetApi failed";
+		}
 	}
 	rResponse.AddHeader(HttpResponse::HeaderNoCache);
 	rResponse.AddHeader("Location: /");
-	rResponse.SetRetCode(302);
 	mpUfo->dt.leaveAction(dtHandleRequest);
-	return rResponse.Send();
+	return rResponse.Send(sBody);
 }
 
 
@@ -181,7 +171,9 @@ bool DynamicRequestHandler::HandleInfoRequest(std::list<TParam>& params, HttpRes
 	cJSON_AddStringToObject(json, "mqttservercert", mpUfo->GetConfig().msMqttServerCert.c_str());
 	cJSON_AddStringToObject(json, "mqttclientkey", mpUfo->GetConfig().msMqttClientKey.empty() ? "" : ".....");
 	cJSON_AddStringToObject(json, "mqttclientcert", mpUfo->GetConfig().msMqttClientCert.c_str());
+	cJSON_AddNumberToObject(json, "mqttqos", mpUfo->GetConfig().muMqttQos);
 	cJSON_AddNumberToObject(json, "mqttkeepalive", mpUfo->GetConfig().muMqttKeepalive);
+	cJSON_AddStringToObject(json, "mqtterrorstate", mpUfo->GetConfig().msMqttErrorState.c_str());
 	char* sBody = cJSON_Print(json);
 	cJSON_Delete(json);
 	rResponse.SetRetCode(sBody ? 200 : 500);
@@ -375,6 +367,8 @@ bool DynamicRequestHandler::HandleMqttConfigRequest(std::list<TParam>& params, H
 			config.muMqttStatusPeriodSeconds = it.paramValue.toInt();
 		else if (it.paramName == "mqttstatusqos")
 			config.muMqttStatusQos = it.paramValue.toInt();
+		else if (it.paramName == "mqttqos")
+			config.muMqttQos = it.paramValue.toInt();
 		else if (it.paramName == "mqtturi")
 			config.msMqttUri = it.paramValue;
 		else if (it.paramName == "mqttpw" && it.paramValue != ".....")
@@ -387,6 +381,8 @@ bool DynamicRequestHandler::HandleMqttConfigRequest(std::list<TParam>& params, H
 			config.msMqttClientCert = it.paramValue;
 		else if (it.paramName == "mqttkeepalive")
 			config.muMqttKeepalive = it.paramValue.toInt();
+		else if (it.paramName == "mqtterrorstate")
+			config.msMqttErrorState = it.paramValue;
 	}
 	config.Write();
 	mbRestart = true;

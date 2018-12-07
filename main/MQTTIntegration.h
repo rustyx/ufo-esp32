@@ -8,6 +8,7 @@ public:
     virtual ~MQTTIntegration();
     void Init();
     void HandleMessage(String data);
+    void HandleCommand(const char * data);
 private:
     static void task_function_mqtt(void *pvParameter);
     void TaskInit();
@@ -20,4 +21,5 @@ private:
     esp_mqtt_client_handle_t mClient;
     bool mActive;
     bool mbConnected = false;
+    bool mInitNeeded = true;
 };

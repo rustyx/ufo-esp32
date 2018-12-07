@@ -29,16 +29,19 @@ public:
 	void InitLogoLeds();
 	void ShowLogoLeds();
 
+	bool IsActive() const	{ return mbApiCallReceived; }
 	void IndicateApiCall() 	{ mbApiCallReceived = true; };
 
 	Config& 				GetConfig()			{ return mConfig; };
 	Wifi& 					GetWifi()			{ return mWifi; };
+	DisplayCharter&			DisplayCharterLevel1()	{ return mDisplayCharterLevel1; }
+	DisplayCharter&			DisplayCharterLevel2()	{ return mDisplayCharterLevel2; }
 	DisplayCharterLogo& 	GetLogoDisplay() 	{ return mDisplayCharterLogo; };
 	ApiStore& 				GetApiStore() 		{ return mApiStore; };
 	DynatraceIntegration&	GetDtIntegration() 	{ return mDt; };
 	AWSIntegration&			GetAWSIntegration() { return mAws; };
     String&					GetId()             { return mId; };
-	DynamicRequestHandler   CreateRequestHandler() { return {this, &mDisplayCharterLevel1, &mDisplayCharterLevel2}; }
+	DynamicRequestHandler   CreateRequestHandler() { return {this}; }
 
 	DynatraceMonitoring dt;
 	

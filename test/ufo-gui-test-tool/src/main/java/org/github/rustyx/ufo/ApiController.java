@@ -60,8 +60,8 @@ public class ApiController {
                 + "\"organization\":\"\",\"department\":\"\",\"location\":\"\",\"dtenabled\":0,\"dtenvid\":\"\","
                 + "\"dtinterval\":0,\"dtmonitoring\":0,\"adminpw\":\"test\",\"mqtturi\":\"mqtts://some-host:8883\","
                 + "\"mqtttopic\":\"/topic/qos0\",\"mqttpw\":\".....\",\"mqttstatusperiodseconds\":66,"
-                + "\"mqttstatusqos\":0,\"mqttkeepalive\":33,"
-                + "\"mqttservercert\":\"-----BEGINCERTIFICATE-----\\ndata\\n-----ENDCERTIFICATE-----\\n\","
+                + "\"mqttstatusqos\":0,\"mqttqos\":1,\"mqttkeepalive\":33,"
+                + "\"mqttservercert\":\"-----BEGIN CERTIFICATE-----\\ndata\\n-----END CERTIFICATE-----\\n\","
                 + "\"mqttclientkey\":\"\",\"mqttclientcert\":\"\"}";
     }
 
