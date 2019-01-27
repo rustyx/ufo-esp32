@@ -122,8 +122,10 @@ void Ufo::TaskWebServer(){
 }
 
 void Ufo::TaskDisplay(){
-	__uint8_t uSendState = 0;
+	uint8_t uSendState = 0;
+	const unsigned slowtick = 100;
 	while (1){
+		bool highrate = false; // for power saving
 		if (mWifi.IsConnected() && (mbApiCallReceived || (mDt.IsActive() && mStateDisplay.IpShownLongEnough()))){
 			if (!uSendState){
 				mDisplayCharterLevel1.Display(mStripeLevel1, true);
@@ -133,14 +135,16 @@ void Ufo::TaskDisplay(){
 			else{
 				mDisplayCharterLevel1.Display(mStripeLevel1, false);
 				mDisplayCharterLevel2.Display(mStripeLevel2, false);
-				if (uSendState >= 5)
+				if (++uSendState == 5)
 					uSendState = 0;
-				else
-					uSendState++;
 			}
+			highrate = (mDisplayCharterLevel1.IsDynamic() || mDisplayCharterLevel2.IsDynamic());
 		}
-		else
-			mStateDisplay.Display(mStripeLevel1, mStripeLevel2);
+		else {
+			highrate = false;
+			for (unsigned i = 0; i < slowtick; ++i)
+				mStateDisplay.Display(mStripeLevel1, mStripeLevel2);
+		}
 
 		mDisplayCharterLogo.Display(mStripeLogo);
 
@@ -165,7 +169,7 @@ void Ufo::TaskDisplay(){
 		else
 			mbButtonPressed = false;
 
-		vTaskDelay(1);
+		vTaskDelay(highrate ? 1 : slowtick);
 	}
 }
 

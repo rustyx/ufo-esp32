@@ -22,6 +22,7 @@ class DisplayCharter
     void ParseWhirlArg(String& argument);
     void ParseMorphArg(String& argument);
     void Display(DotstarStripe &dotstar, bool send);
+    bool IsDynamic() const { return whirlSpeed || morphSpeed; }
 
   private:
     //__uint32_t GetPixelColor(__uint8_t i);
