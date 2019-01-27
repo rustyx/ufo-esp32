@@ -133,6 +133,8 @@ esp_err_t MQTTIntegration::HandleEvent(esp_mqtt_event_handle_t event) {
         case MQTT_EVENT_ERROR:
             ESP_LOGE(LOGTAG, "MQTT_EVENT_ERROR");
             break;
+        default:
+             break;
     }
     return ESP_OK;
 }
